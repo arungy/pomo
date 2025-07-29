@@ -1,4 +1,5 @@
 import os
+import sys
 import tkinter as tk
 from tkinter import messagebox, filedialog
 import time
@@ -13,15 +14,23 @@ import traceback
 
 try:
     import winsound
-    def play_beep_real(duration_ms=1200, frequency=600):
+    def play_beep_real(duration_ms=800, frequency=450):
         winsound.Beep(frequency, duration_ms)
 except ImportError:
-    def play_beep_real(duration_ms=1200, frequency=600):
+    def play_beep_real(duration_ms=800, frequency=450):
         pass  # No sound on non-Windows platforms or missing winsound
 
-# Constants for data files
-DATA_FILE_SETTINGS = "pomosettings.pkl"
-DATA_FILE_LOG = "pomolog.pkl"
+def get_app_folder():
+    if getattr(sys, 'frozen', False):
+        # Running as bundled executable
+        return os.path.dirname(sys.executable)
+    else:
+        # Running as a script
+        return os.path.dirname(os.path.abspath(__file__))
+
+APP_FOLDER = get_app_folder()
+DATA_FILE_SETTINGS = os.path.join(APP_FOLDER, "pomosettings.pkl")
+DATA_FILE_LOG = os.path.join(APP_FOLDER, "pomolog.pkl")
 
 # UI Colors
 RESET_BG = "#f4a261"
@@ -32,9 +41,8 @@ RESUME_BG = "#43a047"
 RESUME_ACTIVE_BG = "#388e3c"
 POMODORO_BTN_BG = "#4a90e2"
 POMODORO_BTN_ACTIVE_BG = "#357ABD"
-EXPORT_BTN_BG = RESUME_BG  # Export CSV button shares Resume button color
-EXPORT_BTN_ACTIVE_BG = RESUME_ACTIVE_BG
-
+EXPORT_BTN_BG = "#4a90e2"       # Blue color for Export CSV button
+EXPORT_BTN_ACTIVE_BG = "#357ABD"
 
 class SettingsManager:
     """Handle loading and saving settings and counters."""
@@ -55,7 +63,7 @@ class SettingsManager:
             "date": "",
             "pomodoro": 0,
             "break": 0,
-            "settings": {},  # ex: {"muted": False, "window_position": (x, y), ...}
+            "settings": {},  # e.g. {"muted": False, "window_position": (x, y), ...}
         }
 
     def save(self):
@@ -82,7 +90,6 @@ class SettingsManager:
         if dict_key not in self.data or not isinstance(self.data[dict_key], dict):
             self.data[dict_key] = {}
         self.data[dict_key][inner_key] = value
-
 
 class SessionLogManager:
     """Handle loading and saving session logs."""
@@ -117,7 +124,6 @@ class SessionLogManager:
     def get_all(self):
         return self.session_log
 
-
 class SoundPlayer:
     """Asynchronous beep sound player."""
 
@@ -127,16 +133,9 @@ class SoundPlayer:
     def play_beep(self, session_type=None, muted=False):
         if muted:
             return
-        duration = 1200   # ms
-        frequency = 600   # Hz
-        if session_type == "break":
-            duration = 800
-            frequency = 450
-        elif session_type == "pomodoro":
-            duration = 1200
-            frequency = 600
+        duration = 800   # ms
+        frequency = 450  # Hz
         self.executor.submit(play_beep_real, duration, frequency)
-
 
 class PomodoroTimer(tk.Tk):
     POMODORO_DURATION = 25 * 60
@@ -144,7 +143,7 @@ class PomodoroTimer(tk.Tk):
 
     def __init__(self):
         super().__init__()
-        self.title("Pomodoro Timer")
+        self.title("Pomo")
         self.configure(bg="#f5f5f5")
 
         # Managers
@@ -173,7 +172,7 @@ class PomodoroTimer(tk.Tk):
         self.pomodoro_done = self.settings.get("pomodoro", 0)
         self.break_done = self.settings.get("break", 0)
 
-        # Settings dict, e.g. muted state
+        # User settings dict (e.g. muted state)
         self.user_settings = self.settings.get("settings", {})
         self.is_muted = self.user_settings.get("muted", False)
 
@@ -304,8 +303,8 @@ class PomodoroTimer(tk.Tk):
         self.reset_btn = tk.Button(
             ctrl_frame, text="Reset", command=self.reset_timer, state=tk.DISABLED,
             font=self.button_font, bd=0,
-            bg=RESET_BG, fg="white",
-            activebackground=RESET_ACTIVE_BG, activeforeground="white",
+            bg=PAUSE_BG, fg="white",
+            activebackground=PAUSE_ACTIVE_BG, activeforeground="white",
             cursor="hand2", relief="raised",
             width=ctrl_btn_width, padx=ctrl_btn_padx, pady=ctrl_btn_pady
         )
@@ -352,7 +351,7 @@ class PomodoroTimer(tk.Tk):
 
     def update_timer_label(self):
         mins, secs = divmod(self.time_left, 60)
-        self.timer_label.config(text=f"{mins:d}:{secs:02d}")
+        self.timer_label.config(text=f"{mins:>2d}:{secs:02d}")
 
     def _start_session(self, duration, session_type):
         self.cancel_timer()
@@ -360,7 +359,7 @@ class PomodoroTimer(tk.Tk):
         self.current_session = session_type
         self.is_running = True
 
-        self.session_label.config(text=f"{session_type.capitalize()} Session", fg="#4a90e2")
+        self.session_label.config(text=f"{session_type.capitalize()} session", fg="#4a90e2")
         self.update_timer_label()
 
         self.pause_btn.config(state=tk.NORMAL, text="Pause",
@@ -400,15 +399,19 @@ class PomodoroTimer(tk.Tk):
     def pause_resume(self):
         if self.is_running:
             self.is_running = False
-            self.pause_btn.config(text="Resume", bg=RESUME_BG, activebackground=RESUME_ACTIVE_BG, fg="white", activeforeground="white")
-            self.reset_btn.config(state=tk.NORMAL, bg=RESET_BG, activebackground=RESET_ACTIVE_BG, fg="white", activeforeground="white")
+            self.pause_btn.config(text="Resume", bg=RESUME_BG, activebackground=RESUME_ACTIVE_BG,
+                                  fg="white", activeforeground="white")
+            self.reset_btn.config(state=tk.NORMAL, bg=RESET_BG, activebackground=RESET_ACTIVE_BG,
+                                  fg="white", activeforeground="white")
             if self.timer_job:
                 self.after_cancel(self.timer_job)
                 self.timer_job = None
         else:
             self.is_running = True
-            self.pause_btn.config(text="Pause", bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG, fg="white", activeforeground="white")
-            self.reset_btn.config(state=tk.NORMAL, bg=RESET_BG, activebackground=RESET_ACTIVE_BG, fg="white", activeforeground="white")
+            self.pause_btn.config(text="Pause", bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG,
+                                  fg="white", activeforeground="white")
+            self.reset_btn.config(state=tk.NORMAL, bg=RESET_BG, activebackground=RESET_ACTIVE_BG,
+                                  fg="white", activeforeground="white")
             self._schedule_tick()
 
     def reset_timer(self):
@@ -422,8 +425,10 @@ class PomodoroTimer(tk.Tk):
         self.pomodoro_btn.config(state=tk.NORMAL)
         self.break_btn.config(state=tk.NORMAL)
 
-        self.pause_btn.config(state=tk.DISABLED, text="Pause", bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG, fg="white", activeforeground="white")
-        self.reset_btn.config(state=tk.DISABLED, bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG, fg="white", activeforeground="white")
+        self.pause_btn.config(state=tk.DISABLED, text="Pause", bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG,
+                              fg="white", activeforeground="white")
+        self.reset_btn.config(state=tk.DISABLED, bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG,
+                              fg="white", activeforeground="white")
 
     def cancel_timer(self):
         if self.timer_job:
@@ -433,8 +438,10 @@ class PomodoroTimer(tk.Tk):
     def _end_session(self):
         self.is_running = False
 
-        self.pause_btn.config(state=tk.DISABLED, bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG, fg="white", activeforeground="white")
-        self.reset_btn.config(state=tk.DISABLED, bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG, fg="white", activeforeground="white")
+        self.pause_btn.config(state=tk.DISABLED, bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG,
+                              fg="white", activeforeground="white")
+        self.reset_btn.config(state=tk.DISABLED, bg=PAUSE_BG, activebackground=PAUSE_ACTIVE_BG,
+                              fg="white", activeforeground="white")
 
         self.pomodoro_btn.config(state=tk.NORMAL)
         self.break_btn.config(state=tk.NORMAL)
@@ -458,8 +465,6 @@ class PomodoroTimer(tk.Tk):
         self.session_log.append(entry)
 
         self.update_counts_display()
-
-        messagebox.showinfo("Session ended", f"{self.current_session.capitalize()} session has ended")
 
         self.session_label.config(text="Choose an option", fg="#333", wraplength=360, justify=tk.CENTER)
         self.timer_label.config(text="00:00")
@@ -494,7 +499,5 @@ class PomodoroTimer(tk.Tk):
     def get_today_key():
         return time.strftime("%Y-%m-%d")
 
-
 if __name__ == "__main__":
     PomodoroTimer().mainloop()
-
