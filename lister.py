@@ -20,7 +20,7 @@ if getattr(sys, "frozen", False):
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 
-STORAGE_FILE = os.path.join(base_path, "tasklogs.json")
+STORAGE_FILE = os.path.join(base_path, "listerlogs.json")
 
 # Constants
 COLOR_COMPLETED = "#808080"
