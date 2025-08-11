@@ -84,8 +84,15 @@ class DiaryUI(tk.Tk):
         self.selected_date = date.today()
         self.selected_date_str = self.date_utils.format_date(self.selected_date)
 
-        self.title("CalN Diary")
-        self.minsize(800, 600)
+        self.title("CalN")
+
+        window_width, window_height = 800, 600
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (window_width // 2)
+        y = (screen_height // 2) - (window_height // 2)
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.minsize(window_width, window_height)
 
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
