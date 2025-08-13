@@ -72,7 +72,7 @@ class TaskManager:
     def get_pomodoro_today(self): return self.pomodoro_stats.get(str(date.today()), 0)
 
 # ======================= UI ======================
-class SimpleTaskUI:
+class ListerUI:
     def __init__(self, root):
         self.root = root
         self.manager = TaskManager(); self.manager.load()
@@ -84,14 +84,14 @@ class SimpleTaskUI:
         self.setup_window(); self.create_widgets(); self.bind_shortcuts(); self.refresh()
 
     def setup_window(self):
-        self.root.title("Lister")
+        self.root.title("Lister [Goal: work using 5 minutes pomodoro]")
         w, h = 800, 600
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         self.root.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h-200)//2}")
         self.root.minsize(w, h)
 
     def create_widgets(self):
-        self.pomo_label = tk.Label(self.root, text="", font=FONT_NORMAL, fg="#AA0000")
+        self.pomo_label = tk.Label(self.root, text="", font=FONT_NORMAL)
         self.pomo_label.pack(padx=10, pady=2, fill="x")
         self.entry = tk.Entry(self.root, font=FONT_NORMAL)
         self.entry.pack(padx=10, pady=5, fill="x")
@@ -105,7 +105,7 @@ class SimpleTaskUI:
         self.listbox.bind("<Delete>", self.delete_task)
         self.listbox.bind("<space>", self.toggle_task_completed)
         self.menu = tk.Menu(self.root, tearoff=0)
-        self.menu.add_command(label="Toggle for today", command=self.toggle_for_today_selected_task)
+        self.menu.add_command(label="Mark for today", command=self.toggle_for_today_selected_task)
         self.menu.add_separator()
         self.menu.add_command(label="Show shortcuts", command=self.show_shortcuts)
         self.listbox.bind("<Button-3>", self.show_context_menu)
@@ -197,14 +197,14 @@ class SimpleTaskUI:
     def show_context_menu(self, event):
         if not self.listbox.curselection(): return
         t = self.get_selected_task()
-        if t: self.menu.entryconfig(0, label="Toggle not for today" if t.for_today else "Toggle for today")
+        if t: self.menu.entryconfig(0, label="Mark not for today" if t.for_today else "Mark for today")
         self.menu.tk_popup(event.x_root, event.y_root)
 
     def show_shortcuts(self):
         messagebox.showinfo("Keyboard shortcuts", 
-            "Ctrl+P : Start Pomodoro\nCtrl+S : Stop Pomodoro\nEnter  : Add/Edit\n"
-            "Escape : Cancel editing\nDelete : Delete\nSpace  : Toggle completion\n"
-            "Right Click : Toggle Today\nF1     : Help\n")
+            "Ctrl+P : Start pomodoro\nCtrl+S : Stop pomodoro\nEnter  : Add/Edit task\n"
+            "Escape : Cancel editing\nDelete : Delete task\nSpace  : Mark completed or not\n"
+            "Right Click : Mark for today or not\nF1     : Help\n")
 
     def start_timer(self, phase, minutes):
         self.pomodoro_phase, self.pomodoro_time_left, self.pomodoro_running = phase, minutes*60, True
@@ -224,12 +224,12 @@ class SimpleTaskUI:
     def next_phase(self):
         if self.pomodoro_phase == "work":
             self.manager.increment_pomodoro_today(); self.manager.save()
-            if messagebox.askyesno("Pomodoro Complete", "Start your break now?"):
+            if messagebox.askyesno("Pomodoro", "Do you take a break now?"):
                 self.start_timer("break", POMODORO_BREAK_MINUTES)
             else:
                 self.stop_pomodoro()
         else:
-            messagebox.showinfo("Break", "Break over! Back to work."); self.stop_pomodoro()
+            messagebox.showinfo("Pomodoro", "Break over! Back to work."); self.stop_pomodoro()
 
     def stop_pomodoro(self):
         self.pomodoro_running = False; self.pomodoro_phase = None
@@ -237,7 +237,14 @@ class SimpleTaskUI:
 
     def update_pomodoro_label(self):
         if not self.pomodoro_running:
-            self.pomo_label.config(text=f"Pomodoros Today: {self.manager.get_pomodoro_today()}")
+            total_sessions = self.manager.get_pomodoro_today()
+            total_minutes = total_sessions * POMODORO_WORK_MINUTES
+            hours, minutes = divmod(total_minutes, 60)
+            if hours > 0:
+                time_str = f"{hours}h {minutes}m"
+            else:
+                time_str = f"{minutes}m"
+            self.pomo_label.config(text=f"Pomodoro time today: {time_str}")
         else:
             mins, secs = divmod(self.pomodoro_time_left, 60)
             phase = "Pomodoro" if self.pomodoro_phase == "work" else "Break"
@@ -246,7 +253,7 @@ class SimpleTaskUI:
 # ====================== MAIN =====================
 def main():
     root = tk.Tk()
-    SimpleTaskUI(root)
+    ListerUI(root)
     root.mainloop()
 
 if __name__ == "__main__":
